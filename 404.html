@@ -1,0 +1,35 @@
+<script type="module">
+
+    function createErrorMessage(message) {
+        const div = document.createElement('div');
+        div.innerText = message;
+        div.style.color = 'red';
+        return div;
+    }
+
+    function gistSegments() {
+        return document.location.pathname.split('/').filter(s => s).slice(1);
+    }
+    
+    const [userId, gistId, versionId, file] = gistSegments();
+
+    if (!userId) {
+        document.body.appendChild(createErrorMessage('Missing user'));
+        // Consider listing gists and showing links if no gist id is provided
+        // https://api.github.com/users/USER/gists
+    } else {
+        const url = `https://gist.githubusercontent.com/${userId}/${gistId}/raw/${versionId ? `${versionId}/`: ''}${file ? `/${file}` :''}`;
+        const response = await fetch(url);
+        if (response.ok) {
+            const raw = await response.text();
+            const iframe = document.createElement('iframe');
+            document.body.appendChild(iframe);
+            iframe.setAttribute('width', '100%');
+            iframe.setAttribute('height', '100%');
+            iframe.setAttribute('frameborder', '0');
+            iframe.srcdoc = raw;
+        } else {
+            document.body.appendChild(createErrorMessage(`Unable to access gist for ${userId}/${gistId}/${versionId}`));
+        }
+    }
+</script>
