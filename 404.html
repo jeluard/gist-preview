@@ -1,35 +1,68 @@
+<style>
+    body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
 <script type="module">
+    import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
 
     function createErrorMessage(message) {
         const div = document.createElement('div');
         div.innerText = message;
         div.style.color = 'red';
+        div.style.display = 'flex';
         return div;
     }
 
     function gistSegments() {
         return document.location.pathname.split('/').filter(s => s).slice(1);
     }
-    
-    const [userId, gistId, versionId, file] = gistSegments();
 
+    function listRecentGists(userId) {
+        return fetch(`https://api.github.com/users/${userId}/gists`)
+            .then(response => response.json());
+    }
+
+    function getGist(userId, gistId) {
+        return fetch(`https://api.github.com/gists/${gistId}`)
+            .then(response => response.json());
+    }
+
+    function formatContent(content, type) {
+        if (type === 'text/markdown') {
+            return marked.parse(content);
+        }
+        return content;
+    }
+
+    async function fetchGistFileContent({files}, filename) {
+        const file = filename ? files[filename] : Object.entries(files)[0][1];
+        const {content, type, raw_url} = file;
+        if (content) {
+            return file;
+        } else {
+            const content = await fetch(raw_url).then(response => response.text());
+            return {type, content};
+        }
+    }
+
+    const [userId, gistId, versionId, filename] = gistSegments();
     if (!userId) {
-        document.body.appendChild(createErrorMessage('Missing user'));
-        // Consider listing gists and showing links if no gist id is provided
-        // https://api.github.com/users/USER/gists
+        document.body.appendChild(createErrorMessage('A user id must be provided as part of the URL'));
     } else {
-        const url = `https://gist.githubusercontent.com/${userId}/${gistId}/raw/${versionId ? `${versionId}/`: ''}${file ? `/${file}` :''}`;
-        const response = await fetch(url);
-        if (response.ok) {
-            const raw = await response.text();
+        const gist = gistId ? await getGist(userId, gistId, versionId) : (await listRecentGists(userId))[0];
+        const {type, content} = await fetchGistFileContent(gist, filename);
+        if (content) {
             const iframe = document.createElement('iframe');
             document.body.appendChild(iframe);
             iframe.setAttribute('width', '100%');
             iframe.setAttribute('height', '100%');
             iframe.setAttribute('frameborder', '0');
-            iframe.srcdoc = raw;
+            iframe.srcdoc = formatContent(content, type);
         } else {
-            document.body.appendChild(createErrorMessage(`Unable to access gist for ${userId}/${gistId}/${versionId}`));
+            document.body.appendChild(createErrorMessage(`Unable to access gist file content for ${userId}/${gistId}/${versionId}/${filename}`));
         }
     }
 </script>
